@@ -14,13 +14,15 @@ use App\Repository\MessageRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use App\Controller\MessageVoteController;
+
 
 #[ORM\Entity(repositoryClass: MessageRepository::class)]
 #[ApiResource(
     operations: [
-//        new GetCollection(normalizationContext: ['groups' => ['thread:read']]),
+        //        new GetCollection(normalizationContext: ['groups' => ['thread:read']]),
         new Post(denormalizationContext: ['groups' => ['message:write']], security: "is_granted('ROLE_USER')"),
-//        new Get(normalizationContext: ['groups' => ['thread:read']]),
+        //        new Get(normalizationContext: ['groups' => ['thread:read']]),
         new Delete(security: "is_granted('ROLE_ADMIN') or object.owner == user"),
         new Patch(
             denormalizationContext: ['groups' => ['message:write']],
@@ -30,18 +32,43 @@ use Symfony\Component\Serializer\Annotation\Groups;
 )]
 #[ApiResource(
     uriTemplate: '/threads/{thread_id}/messages',
-    operations: [ new GetCollection() ],
+    operations: [new GetCollection()],
     uriVariables: [
         'thread_id' => new Link(toProperty: 'thread', fromClass: Thread::class),
     ],
     denormalizationContext: ['groups' => ['message:read']]
 )]
+
+#[ApiResource(
+    //    operations: [ new Post(security: "is_granted('ROLE_USER')") ],
+    //    denormalizationContext: ['groups' => ['request:write']],
+    operations: [
+        new Post(
+            uriTemplate: '/messages/{id}/vote/{type}',
+            controller: MessageVoteController::class,
+            description: 'Add or downvote a message',
+            name: 'Message_Vote_Controller'
+        )
+    ],
+    denormalizationContext: ['groups' => ['request:empty']]
+)]
+
 class Message
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
+
+    #[ORM\Column(type: Types::INTEGER)]
+    #[Groups(['message:read', 'message:list'])]
+    private ?int $upvotes = 0;
+
+    #[ORM\Column(type: Types::INTEGER)]
+    #[Groups(['message:read', 'message:list'])]
+    private ?int $downvotes = 0;
+
+
 
     #[ORM\Column(type: Types::TEXT)]
     #[Groups(['message:write', 'message:read'])]
@@ -74,7 +101,57 @@ class Message
         $this->createdAt = new \DateTimeImmutable('now');
     }
 
+    public function getUpvotes(): ?int
+    {
+        return $this->upvotes;
+    }
 
+    public function setUpvotes(int $upvotes): self
+    {
+        $this->upvotes = $upvotes;
+
+        return $this;
+    }
+
+    public function getDownvotes(): ?int
+    {
+        return $this->downvotes;
+    }
+
+    public function setDownvotes(int $downvotes): self
+    {
+        $this->downvotes = $downvotes;
+
+        return $this;
+    }
+
+    public function addUpvote(): self
+    {
+        $this->upvotes++;
+
+        return $this;
+    }
+
+    public function addDownvote(): self
+    {
+        $this->downvotes++;
+
+        return $this;
+    }
+
+    public function removeUpvote(): self
+    {
+        $this->upvotes--;
+
+        return $this;
+    }
+
+    public function removeDownvote(): self
+    {
+        $this->downvotes--;
+
+        return $this;
+    }
     public function getId(): ?int
     {
         return $this->id;
